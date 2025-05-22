@@ -48,18 +48,20 @@ end)
 lib.addCommand('indicate_left', {
   help = 'Toggle left vehicle indicator',
   restricted = false
-}, function(source, args, raw)
-  TriggerClientEvent('vehicle:toggleIndicator', source, 'left')
+}, function(source)
+  lib.callback.await('jg-vehicleindicators:client:toggle-indicator', source, 5000, 'left')
 end) 
+
 lib.addCommand('indicate_right', {
   help = 'Toggle right vehicle indicator',
   restricted = false
-}, function(source, args, raw)
-  TriggerClientEvent('vehicle:toggleIndicator', source, 'right')
+}, function(source)
+  lib.callback.await('jg-vehicleindicators:client:toggle-indicator', source, 5000, 'right')
 end)
+
 lib.addCommand('hazards', {
   help = 'Toggle vehicle hazard lights',
   restricted = false
-}, function(source, args, raw)
-  TriggerClientEvent('vehicle:toggleIndicator', source, 'hazards')
+}, function(source)
+  lib.callback.await('jg-vehicleindicators:client:toggle-indicator', source, 5000, 'hazards')
 end)

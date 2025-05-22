@@ -108,3 +108,7 @@ lib.callback.register('jg-vehicleindicators:client:toggle-all', function(enable)
     lib.callback.await('jg-vehicleindicators:server:set-state', 3000, vehicleId, enable and {true, true} or {false, false})
     return true
 end)
+
+lib.callback.register('jg-vehicleindicators:client:toggle-indicator', function(direction)
+  return toggleIndicator(direction)
+end)
