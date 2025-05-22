@@ -1,41 +1,110 @@
-local function isIndicating(vehicle, type)
-  if not Entity(vehicle).state.indicate then return false end
-  local state = Entity(vehicle).state.indicate
+local vehicleIndicators = {}
+local brakeLightsOn = false
+local previousSpeed = 0
+local lastBrakeCheck = 0
 
-  if state[1] and state[2] and type == "hazards" then return true end
-  if state[1] and not state[2] and type == "right" then return true end
-  if not state[1] and state[2] and type == "left" then return true end
-
-  return false
+local function toggleIndicator(direction)
+    if not cache.vehicle or cache.seat ~= -1 then return false end
+    
+    local vehicleId = VehToNet(cache.vehicle)
+    if not vehicleId or vehicleId == 0 then return false end
+    
+    local currentState = vehicleIndicators[vehicleId] or {false, false}
+    local newState
+    
+    if direction == 'left' then
+        newState = (currentState[2] or not currentState[1]) and {true, false} or {false, false}
+    elseif direction == 'right' then
+        newState = (currentState[1] or not currentState[2]) and {false, true} or {false, false}
+    elseif direction == 'hazards' then
+        newState = (currentState[1] and currentState[2]) and {false, false} or {true, true}
+    else
+        return false
+    end
+    
+    lib.callback.await('jg-vehicleindicators:server:set-state', 3000, vehicleId, newState)
+    return true
 end
 
-local function indicate(type)
-  local ped = PlayerPedId()
-  if not IsPedInAnyVehicle(ped) then return false end
-  local vehicle = GetVehiclePedIsIn(ped)
-  
-  local value = {}
-  if type == "left" and not isIndicating(vehicle, "left") then value = {false, true}
-  elseif type == "right" and not isIndicating(vehicle, "right") then value = {true, false}
-  elseif type == "hazards" and not isIndicating(vehicle, "hazards") then value = {true, true} 
-  else value = {false, false} end
-
-  TriggerServerEvent("jg-vehicleindicators:server:set-state", VehToNet(vehicle), value)
+local function updateBrakeLights()
+    local currentTime = GetGameTimer()
+    if currentTime - lastBrakeCheck < 50 then return end
+    lastBrakeCheck = currentTime
+    
+    local currentSpeed = GetEntitySpeed(cache.vehicle) * 2.237
+    local shouldShowBrakes = (currentSpeed - previousSpeed) < -1.5 or currentSpeed < 0.2
+    
+    if shouldShowBrakes ~= brakeLightsOn then
+        SetVehicleBrakeLights(cache.vehicle, shouldShowBrakes)
+        brakeLightsOn = shouldShowBrakes
+    end
+    previousSpeed = currentSpeed
 end
 
-AddStateBagChangeHandler("indicate", nil, function(bagName, key, data)
-  local entity = GetEntityFromStateBagName(bagName)
-  if entity == 0 then return end
-  for i, status in ipairs(data) do
-    SetVehicleIndicatorLights(entity, i - 1, status)
-  end
+AddStateBagChangeHandler('indicate', nil, function(bagName, key, data)
+    if type(data) ~= 'table' or #data ~= 2 then return end
+    
+    local vehicle = GetEntityFromStateBagName(bagName)
+    if not vehicle or vehicle == 0 then return end
+    
+    local vehicleId = VehToNet(vehicle)
+    if vehicleId and vehicleId ~= 0 then
+        vehicleIndicators[vehicleId] = data
+        SetVehicleIndicatorLights(vehicle, 0, data[1])
+        SetVehicleIndicatorLights(vehicle, 1, data[2])
+    end
 end)
 
-RegisterCommand("indicate_left", function() indicate("left") end)
-RegisterKeyMapping('indicate_left', 'Vehicle indicate left', 'keyboard', 'LEFT')
+CreateThread(function()
+    while true do
+        if cache.vehicle and cache.seat == -1 then
+            updateBrakeLights()
+        end
+        Wait(0)
+    end
+end)
 
-RegisterCommand("indicate_right", function() indicate("right") end)
-RegisterKeyMapping('indicate_right', 'Vehicle indicate right', 'keyboard', 'RIGHT')
+lib.onCache('vehicle', function(vehicle)
+    if vehicle then
+        previousSpeed = 0
+        brakeLightsOn = false
+        lastBrakeCheck = 0
+    end
+end)
+lib.addKeybind({
+  name = 'indicate_left',
+  description = 'Vehicle indicate left',
+  defaultKey = 'LEFT',
+  defaultMapper = 'keyboard',
+  onPressed = function(self)
+      toggleIndicator('left')
+  end
+})
+lib.addKeybind({
+  name = 'indicate_right', 
+  description = 'Vehicle indicate right',
+  defaultKey = 'RIGHT',
+  defaultMapper = 'keyboard',
+  onPressed = function(self)
+      toggleIndicator('right')
+  end
+})
+lib.addKeybind({
+  name = 'hazards',
+  description = 'Vehicle hazards',
+  defaultKey = 'UP',
+  defaultMapper = 'keyboard',
+  onPressed = function(self)
+      toggleIndicator('hazards')
+  end
+})
 
-RegisterCommand("hazards", function() indicate("hazards") end)
-RegisterKeyMapping('hazards', 'Vehicle hazards', 'keyboard', 'UP')
+lib.callback.register('jg-vehicleindicators:client:toggle-all', function(enable)
+    if not cache.vehicle or cache.seat ~= -1 then return false end
+    
+    local vehicleId = VehToNet(cache.vehicle)
+    if not vehicleId or vehicleId == 0 then return false end
+    
+    lib.callback.await('jg-vehicleindicators:server:set-state', 3000, vehicleId, enable and {true, true} or {false, false})
+    return true
+end)

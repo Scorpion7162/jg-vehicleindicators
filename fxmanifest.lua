@@ -1,11 +1,10 @@
-fx_version "cerulean"
-game "gta5"
-lua54 "yes"
-
-description "Synced turn signals & hazards"
-version "1.0"
-author "JG Scripts"
-
-client_scripts {"client.lua"}
-
-server_scripts {"server.lua"}
+fx_version 'cerulean'
+game 'gta5'
+lua54 'yes'
+use_experimental_fxv2_oal 'yes'
+description 'Synced turn signals & hazards'
+version '1.1'
+author 'JG Scripts'
+client_scripts 'client.lua'
+shared_scripts '@ox_lib/init.lua'
+server_scripts 'server.lua'
